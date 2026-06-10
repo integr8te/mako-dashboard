@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAKO Offshore — Penetration Management Dashboard</title>
+<style>
+  :root {
+    --navy: #0B1929;
+    --amber: #E8A33D;
+    --blue: #3A9FD5;
+    --green: #21A366;
+    --red: #C0392B;
+    --orange: #E67E22;
+    --yellow: #F1C40F;
+    --grey: #5A6772;
+    --light: #F4F6F9;
+    --white: #FFFFFF;
+    --card: #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: var(--light); color: var(--navy); }
+
+  /* HEADER */
+  .header { background: var(--navy); color: white; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .header-left { display: flex; align-items: center; gap: 1rem; }
+  .logo { font-size: 1.3rem; font-weight: 700; color: var(--amber); letter-spacing: 2px; }
+  .asset-label { font-size: 0.85rem; color: #B8C4D4; }
+  .asset-name { font-size: 1rem; font-weight: 600; color: white; }
+  .header-right { font-size: 0.75rem; color: #B8C4D4; text-align: right; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 5px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* NAV TABS */
+  .nav { background: #132337; display: flex; gap: 0; border-bottom: 3px solid var(--amber); overflow-x: auto; }
+  .nav-tab { padding: 0.75rem 1.4rem; font-size: 0.8rem; font-weight: 600; color: #B8C4D4; cursor: pointer; border: none; background: none; white-space: nowrap; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+  .nav-tab:hover { color: var(--amber); background: rgba(232,163,61,0.08); }
+  .nav-tab.active { color: var(--amber); border-bottom: 3px solid var(--amber); margin-bottom: -3px; background: rgba(232,163,61,0.1); }
+
+  /* CONTENT */
+  .content { padding: 1.5rem 2rem; display: none; }
+  .content.active { display: block; }
+
+  /* KPI CARDS */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card { background: var(--card); border-radius: 8px; padding: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-top: 4px solid var(--blue); }
+  .kpi-card.red { border-top-color: var(--red); }
+  .kpi-card.orange { border-top-color: var(--orange); }
+  .kpi-card.green { border-top-color: var(--green); }
+  .kpi-card.amber { border-top-color: var(--amber); }
+  .kpi-card.grey { border-top-color: var(--grey); }
+  .kpi-value { font-size: 2rem; font-weight: 700; color: var(--navy); }
+  .kpi-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey); margin-top: 4px; }
+  .kpi-sub { font-size: 0.75rem; color: var(--grey); margin-top: 2px; }
+
+  /* SECTION HEADINGS */
+  .section-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--navy); margin: 1.5rem 0 0.75rem; padding-bottom: 6px; border-bottom: 2px solid var(--amber); }
+
+  /* TWO COL GRID */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media(max-width:900px){ .two-col { grid-template-columns: 1fr; } }
+
+  /* CARDS */
+  .card { background: var(--card); border-radius: 8px; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .card-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey); margin-bottom: 1rem; }
+
+  /* BARRIER PANEL */
+  .barrier-row { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid #EEF0F2; }
+  .barrier-row:last-child { border-bottom: none; }
+  .barrier-label { font-size: 0.85rem; font-weight: 600; }
+  .barrier-tag { font-size: 0.7rem; color: var(--grey); }
+  .barrier-right { text-align: right; }
+  .barrier-pct { font-size: 1.1rem; font-weight: 700; }
+  .barrier-pct.good { color: var(--green); }
+  .barrier-pct.warn { color: var(--orange); }
+  .barrier-pct.bad { color: var(--red); }
+  .prog-bar { height: 6px; border-radius: 3px; background: #EEF0F2; margin-top: 4px; width: 140px; }
+  .prog-fill { height: 6px; border-radius: 3px; }
+  .fill-green { background: var(--green); }
+  .fill-orange { background: var(--orange); }
+  .fill-red { background: var(--red); }
+
+  /* HEAT MAP */
+  .heatmap { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .deck-card { border-radius: 6px; padding: 0.9rem; color: white; }
+  .deck-card.green { background: var(--green); }
+  .deck-card.amber { background: var(--amber); }
+  .deck-card.orange { background: var(--orange); }
+  .deck-card.red { background: var(--red); }
+  .deck-name { font-size: 0.8rem; font-weight: 700; }
+  .deck-worst { font-size: 0.7rem; opacity: 0.85; margin-top: 3px; }
+  .deck-count { font-size: 1.2rem; font-weight: 700; margin-top: 6px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { background: var(--navy); color: white; padding: 0.6rem 0.8rem; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #EEF0F2; vertical-align: middle; }
+  tr:hover td { background: #F8F9FC; }
+  tr.clickable { cursor: pointer; }
+
+  /* GRADE BADGES */
+  .grade { display: inline-block; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-weight: 700; font-size: 0.8rem; color: white; }
+  .g1 { background: #27AE60; }
+  .g2 { background: #2ECC71; }
+  .g3 { background: var(--orange); }
+  .g4 { background: #E74C3C; }
+  .g5 { background: #922B21; }
+
+  /* STATUS BADGES */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+  .badge-green { background: #D5F5E3; color: #1E8449; }
+  .badge-orange { background: #FDEBD0; color: #A04000; }
+  .badge-red { background: #FADBD8; color: #922B21; }
+  .badge-grey { background: #EAECEE; color: #5D6D7E; }
+  .badge-blue { background: #D6EAF8; color: #1A5276; }
+  .badge-amber { background: #FEF9E7; color: #9A7D0A; }
+
+  /* TR BADGE */
+  .tr-yes { color: var(--red); font-weight: 700; font-size: 0.75rem; }
+  .tr-no { color: var(--grey); font-size: 0.75rem; }
+
+  /* WORKPAK PIPELINE */
+  .pipeline { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 1.5rem; }
+  .pipeline-stage { flex: 1; min-width: 100px; background: #EEF0F2; border-radius: 6px; padding: 0.5rem; text-align: center; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--grey); }
+  .pipeline-stage.active-stage { background: var(--navy); color: var(--amber); }
+
+  .wp-card { background: var(--card); border-radius: 8px; padding: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 0.75rem; border-left: 5px solid var(--grey); }
+  .wp-card.in-progress { border-left-color: var(--blue); }
+  .wp-card.hold { border-left-color: var(--orange); }
+  .wp-card.qa { border-left-color: var(--amber); }
+  .wp-card.closed { border-left-color: var(--green); }
+  .wp-card.materials { border-left-color: #9B59B6; }
+  .wp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
+  .wp-ref { font-size: 0.7rem; color: var(--grey); }
+  .wp-title { font-size: 0.9rem; font-weight: 700; color: var(--navy); }
+  .wp-meta { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--grey); margin-top: 0.5rem; flex-wrap: wrap; }
+  .wp-prog { height: 8px; background: #EEF0F2; border-radius: 4px; margin-top: 0.6rem; }
+  .wp-prog-fill { height: 8px; border-radius: 4px; background: var(--blue); transition: width 0.3s; }
+
+  /* RISK TABLE */
+  .risk-alert { background: #FADBD8; border-left: 4px solid var(--red); border-radius: 6px; padding: 0.8rem 1rem; margin-bottom: 0.6rem; }
+  .risk-alert .ra-header { font-size: 0.85rem; font-weight: 700; color: var(--red); }
+  .risk-alert .ra-body { font-size: 0.78rem; color: #5D6D7E; margin-top: 3px; }
+
+  /* DETAIL PANEL */
+  .detail-panel { display: none; position: fixed; top: 0; right: 0; width: 420px; height: 100vh; background: white; box-shadow: -4px 0 24px rgba(0,0,0,0.15); z-index: 1000; overflow-y: auto; }
+  .detail-panel.open { display: block; }
+  .detail-header { background: var(--navy); color: white; padding: 1.25rem 1.5rem; }
+  .detail-tag { font-size: 1rem; font-weight: 700; color: var(--amber); }
+  .detail-close { float: right; cursor: pointer; font-size: 1.2rem; color: white; background: none; border: none; }
+  .detail-body { padding: 1.25rem 1.5rem; }
+  .detail-section { margin-bottom: 1.25rem; }
+  .detail-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey); border-bottom: 1px solid #EEF0F2; padding-bottom: 5px; margin-bottom: 0.6rem; }
+  .detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.82rem; }
+  .detail-key { color: var(--grey); }
+  .detail-val { font-weight: 600; color: var(--navy); text-align: right; max-width: 220px; }
+  .overlay { display: none; position: fixed; top:0;left:0;right:0;bottom:0; background: rgba(0,0,0,0.3); z-index: 999; }
+  .overlay.open { display: block; }
+
+  /* FILTERS */
+  .filter-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+  .filter-row select, .filter-row input { padding: 0.4rem 0.7rem; border: 1px solid #DDE1E7; border-radius: 6px; font-size: 0.8rem; color: var(--navy); background: white; }
+  .filter-row label { font-size: 0.75rem; color: var(--grey); font-weight: 600; }
+
+  /* FOOTER */
+  .footer { background: var(--navy); color: #5A7A9A; font-size: 0.7rem; text-align: center; padding: 0.6rem; margin-top: 2rem; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div>
+      <div class="logo">MAKO OFFSHORE</div>
+      <div style="font-size:0.65rem;color:#5A7A9A;letter-spacing:1px">PENETRATION MANAGEMENT DASHBOARD</div>
+    </div>
+    <div style="width:1px;height:36px;background:#1E3A5A;margin:0 0.5rem"></div>
+    <div>
+      <div class="asset-label">ACTIVE ASSET</div>
+      <div class="asset-name">Harbour Jade Platform &nbsp;·&nbsp; <span style="color:#B8C4D4;font-weight:400">CNS Block 30/7 · Harbour Energy</span></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="live-dot"></span>LIVE DATA<br>
+    Survey Phase: Active &nbsp;·&nbsp; Last sync: 01 Jun 2026
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button class="nav-tab active" onclick="showTab('overview')">📊 Asset Overview</button>
+  <button class="nav-tab" onclick="showTab('register')">📋 Penetration Register</button>
+  <button class="nav-tab" onclick="showTab('workpaks')">🔧 WorkPak Tracker</button>
+  <button class="nav-tab" onclick="showTab('risk')">⚠️ Risk & Compliance</button>
+</div>
+
+<!-- ═══════════ TAB 1: ASSET OVERVIEW ═══════════ -->
+<div class="content active" id="tab-overview">
+
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <div class="kpi-value">847</div>
+      <div class="kpi-label">Total Penetrations</div>
+      <div class="kpi-sub">On asset register</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-value">601</div>
+      <div class="kpi-label">Performing</div>
+      <div class="kpi-sub">Grades 1–2 · 71.0%</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-value">184</div>
+      <div class="kpi-label">Degraded</div>
+      <div class="kpi-sub">Grades 3–4 · 21.7%</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-value">28</div>
+      <div class="kpi-label">Failed / Immediate</div>
+      <div class="kpi-sub">Grade 5 · 3.3%</div>
+    </div>
+    <div class="kpi-card grey">
+      <div class="kpi-value">34</div>
+      <div class="kpi-label">Unknown / Unsurveyed</div>
+      <div class="kpi-sub">4.0% remaining</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-value">4</div>
+      <div class="kpi-label">Active WorkPaks</div>
+      <div class="kpi-sub">2 in progress</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- BARRIER PERFORMANCE -->
+    <div class="card">
+      <div class="card-title">🔥 TR Boundary & Barrier Performance</div>
+      <div style="background:#FEF3CD;border-left:4px solid var(--amber);border-radius:4px;padding:0.6rem 0.8rem;font-size:0.78rem;margin-bottom:1rem;color:#7D5A00">
+        ⚠️ TR boundary performance at <strong>77.2%</strong> — below 85% performance standard threshold. Safety Case Regulations action required.
+      </div>
+      <div class="barrier-row">
+        <div><div class="barrier-label">TR Boundary Seals</div><div class="barrier-tag">H-60 / H-120 · Safety Critical</div></div>
+        <div class="barrier-right">
+          <div class="barrier-pct warn">77.2%</div>
+          <div class="prog-bar"><div class="prog-fill fill-orange" style="width:77.2%"></div></div>
+        </div>
+      </div>
+      <div class="barrier-row">
+        <div><div class="barrier-label">H-120 Zone Barriers</div><div class="barrier-tag">Process / TR primary boundaries</div></div>
+        <div class="barrier-right">
+          <div class="barrier-pct warn">71.4%</div>
+          <div class="prog-bar"><div class="prog-fill fill-orange" style="width:71.4%"></div></div>
+        </div>
+      </div>
+      <div class="barrier-row">
+        <div><div class="barrier-label">H-60 Zone Barriers</div><div class="barrier-tag">Module boundaries</div></div>
+        <div class="barrier-right">
+          <div class="barrier-pct good">82.1%</div>
+          <div class="prog-bar"><div class="prog-fill fill-green" style="width:82.1%"></div></div>
+        </div>
+      </div>
+      <div class="barrier-row">
+        <div><div class="barrier-label">A-60 Barriers</div><div class="barrier-tag">Structural fire divisions</div></div>
+        <div class="barrier-right">
+          <div class="barrier-pct good">91.3%</div>
+          <div class="prog-bar"><div class="prog-fill fill-green" style="width:91.3%"></div></div>
+        </div>
+      </div>
+      <div class="barrier-row">
+        <div><div class="barrier-label">A-0 / A-30 Barriers</div><div class="barrier-tag">Internal lower-risk divisions</div></div>
+        <div class="barrier-right">
+          <div class="barrier-pct good">96.8%</div>
+          <div class="prog-bar"><div class="prog-fill fill-green" style="width:96.8%"></div></div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;font-size:0.72rem;color:var(--grey)">Performance standard: ≥85% of rated barriers performing to SCR05 standard</div>
+    </div>
+
+    <!-- HEAT MAP -->
+    <div class="card">
+      <div class="card-title">🗺️ Asset Heat Map — Worst Grade by Deck</div>
+      <div class="heatmap">
+        <div class="deck-card red">
+          <div class="deck-name">Cellar Deck</div>
+          <div class="deck-worst">Worst: Grade 5 · H-120 TR</div>
+          <div class="deck-count">2 × Grade 5</div>
+        </div>
+        <div class="deck-card orange">
+          <div class="deck-name">Top Deck (TR-West)</div>
+          <div class="deck-worst">Worst: Grade 3 · H-120 TR</div>
+          <div class="deck-count">3 × Grade 3–4</div>
+        </div>
+        <div class="deck-card amber">
+          <div class="deck-name">Main Deck</div>
+          <div class="deck-worst">Worst: Grade 4 · A-60</div>
+          <div class="deck-count">2 × Grade 4</div>
+        </div>
+        <div class="deck-card green">
+          <div class="deck-name">Lower Deck</div>
+          <div class="deck-worst">Worst: Grade 4 · H-60</div>
+          <div class="deck-count">1 × Grade 4</div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;display:flex;gap:0.75rem;font-size:0.7rem;flex-wrap:wrap">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:2px"></span> Performing (Grade 1–2)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);border-radius:2px"></span> Degraded (Grade 3)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--orange);border-radius:2px"></span> High Risk (Grade 4)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);border-radius:2px"></span> Immediate Action (Grade 5)</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PROGRAMME PACE -->
+  <div class="section-title">Programme Pace</div>
+  <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+    <div class="kpi-card green">
+      <div class="kpi-value">813</div>
+      <div class="kpi-label">Penetrations Surveyed</div>
+      <div class="kpi-sub">96.0% coverage achieved</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-value">42</div>
+      <div class="kpi-label">Remediated to Date</div>
+      <div class="kpi-sub">of 212 requiring action</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-value">18</div>
+      <div class="kpi-label">ICB Verifications Outstanding</div>
+      <div class="kpi-sub">Submitted, awaiting sign-off</div>
+    </div>
+    <div class="kpi-card orange">
+      <div class="kpi-value">28</div>
+      <div class="kpi-label">Grade 5 — Open Actions</div>
+      <div class="kpi-sub">All have active work orders</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ TAB 2: PENETRATION REGISTER ═══════════ -->
+<div class="content" id="tab-register">
+
+  <div class="filter-row">
+    <label>Grade:</label>
+    <select id="filter-grade" onchange="filterTable()">
+      <option value="">All Grades</option>
+      <option value="1">Grade 1</option>
+      <option value="2">Grade 2</option>
+      <option value="3">Grade 3</option>
+      <option value="4">Grade 4</option>
+      <option value="5">Grade 5</option>
+    </select>
+    <label>TR Boundary:</label>
+    <select id="filter-tr" onchange="filterTable()">
+      <option value="">All</option>
+      <option value="yes">TR Yes</option>
+      <option value="no">TR No</option>
+    </select>
+    <label>Status:</label>
+    <select id="filter-status" onchange="filterTable()">
+      <option value="">All Status</option>
+      <option value="Performing">Performing</option>
+      <option value="Degraded">Degraded</option>
+      <option value="Not Performing">Not Performing</option>
+    </select>
+    <input type="text" id="filter-search" placeholder="🔍 Search tag ID, module, service..." oninput="filterTable()" style="min-width:220px">
+  </div>
+
+  <div class="table-wrap">
+    <table id="reg-table">
+      <thead>
+        <tr>
+          <th>Tag ID</th>
+          <th>Deck</th>
+          <th>Module</th>
+          <th>Rating</th>
+          <th>TR</th>
+          <th>Service</th>
+          <th>Seal</th>
+          <th>Grade</th>
+          <th>Status</th>
+          <th>Work Order</th>
+          <th>ICB</th>
+        </tr>
+      </thead>
+      <tbody id="reg-tbody">
+      </tbody>
+    </table>
+  </div>
+  <div style="font-size:0.75rem;color:var(--grey);margin-top:0.75rem">Showing sample survey data — Harbour Jade Platform · Click any row for full tag detail</div>
+</div>
+
+<!-- ═══════════ TAB 3: WORKPAK TRACKER ═══════════ -->
+<div class="content" id="tab-workpaks">
+
+  <div class="pipeline">
+    <div class="pipeline-stage">Not Started</div>
+    <div class="pipeline-stage active-stage">Materials Confirmed</div>
+    <div class="pipeline-stage active-stage">In Progress</div>
+    <div class="pipeline-stage">Hold – Materials</div>
+    <div class="pipeline-stage">Hold – Access/PTW</div>
+    <div class="pipeline-stage active-stage">QA Pending</div>
+    <div class="pipeline-stage">QA Passed</div>
+    <div class="pipeline-stage">Verification Outst.</div>
+    <div class="pipeline-stage">Closed ✅</div>
+  </div>
+
+  <div id="wp-container"></div>
+</div>
+
+<!-- ═══════════ TAB 4: RISK & COMPLIANCE ═══════════ -->
+<div class="content" id="tab-risk">
+
+  <div class="section-title">⛔ Grade 5 — Immediate Action Log</div>
+  <div class="risk-alert">
+    <div class="ra-header">HBR-D3-W14-001 · Cellar Deck C3 · H-120 TR Boundary</div>
+    <div class="ra-body">HV Power 11kV Cable · Nofirno RISE HD · Modules partially missing · WO-2026-0847 In Progress · ICB Outstanding · Due 30 Jun 2026</div>
+  </div>
+  <div class="risk-alert">
+    <div class="ra-header">HBR-D3-W14-010 · Cellar Deck C4 · H-120 TR Boundary</div>
+    <div class="ra-body">HC Liquid Line 4 inch · MAKO Composite Plug · Plug missing entirely · WO-2026-0848 Open · ICB Outstanding · Due 15 Jun 2026 ⚠️ OVERDUE RISK</div>
+  </div>
+
+  <div class="section-title" style="margin-top:1.5rem">🔒 TR Boundary Status</div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem">
+      <div>
+        <div style="font-size:0.72rem;color:var(--grey);text-transform:uppercase;font-weight:700">Total TR Penetrations</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--navy)">312</div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;color:var(--grey);text-transform:uppercase;font-weight:700">Performing to Standard</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--green)">241 <span style="font-size:1rem">(77.2%)</span></div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;color:var(--grey);text-transform:uppercase;font-weight:700">Not Performing</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--red)">71 <span style="font-size:1rem">(22.8%)</span></div>
+      </div>
+      <div>
+        <div style="font-size:0.72rem;color:var(--grey);text-transform:uppercase;font-weight:700">Performance Standard</div>
+        <div style="font-size:1.8rem;font-weight:700;color:var(--orange)">85% <span style="font-size:0.8rem">target</span></div>
+      </div>
+    </div>
+    <div style="margin-top:1rem;background:#FADBD8;border-radius:6px;padding:0.7rem 1rem;font-size:0.8rem;color:#922B21;font-weight:600">
+      ⚠️ TR boundary performance is 7.8% below the SCR05 performance standard. This must be disclosed in the Safety Case review and a remediation programme evidenced to the duty holder.
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:1.5rem">📋 Performance Standard Tracker</div>
+  <div class="card">
+    <div class="barrier-row" style="padding:0.7rem 0">
+      <div><strong>H-120 Barriers</strong><br><span class="barrier-tag">TR Primary · Process boundaries</span></div>
+      <div class="barrier-right"><div class="barrier-pct bad">71.4%</div><div class="prog-bar" style="width:160px"><div class="prog-fill fill-red" style="width:71.4%"></div></div><div style="font-size:0.65rem;color:var(--red);margin-top:2px">BELOW STANDARD</div></div>
+    </div>
+    <div class="barrier-row" style="padding:0.7rem 0">
+      <div><strong>H-60 Barriers</strong><br><span class="barrier-tag">Module boundaries</span></div>
+      <div class="barrier-right"><div class="barrier-pct warn">82.1%</div><div class="prog-bar" style="width:160px"><div class="prog-fill fill-orange" style="width:82.1%"></div></div><div style="font-size:0.65rem;color:var(--orange);margin-top:2px">BELOW STANDARD</div></div>
+    </div>
+    <div class="barrier-row" style="padding:0.7rem 0">
+      <div><strong>A-60 Barriers</strong><br><span class="barrier-tag">Structural fire divisions</span></div>
+      <div class="barrier-right"><div class="barrier-pct good">91.3%</div><div class="prog-bar" style="width:160px"><div class="prog-fill fill-green" style="width:91.3%"></div></div><div style="font-size:0.65rem;color:var(--green);margin-top:2px">MEETING STANDARD</div></div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:1.5rem">🏛️ ICB / Verification Outstanding</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tag ID</th><th>Location</th><th>Rating</th><th>TR</th><th>Submitted</th><th>Days Outstanding</th><th>ICB Status</th></tr></thead>
+      <tbody>
+        <tr><td>HBR-D3-W14-001</td><td>Cellar Deck C3</td><td>H-120</td><td class="tr-yes">YES</td><td>18 May 2026</td><td style="color:var(--red);font-weight:700">14 days</td><td><span class="badge badge-orange">Outstanding</span></td></tr>
+        <tr><td>HBR-D3-W14-010</td><td>Cellar Deck C4</td><td>H-120</td><td class="tr-yes">YES</td><td>20 May 2026</td><td style="color:var(--red);font-weight:700">12 days</td><td><span class="badge badge-orange">Outstanding</span></td></tr>
+        <tr><td>HBR-D4-TR-005</td><td>Top Deck TR-West</td><td>H-120</td><td class="tr-yes">YES</td><td>22 May 2026</td><td style="color:var(--orange);font-weight:700">10 days</td><td><span class="badge badge-orange">Outstanding</span></td></tr>
+        <tr><td>HBR-D2-M12-004</td><td>Main Deck M12</td><td>A-60</td><td class="tr-no">No</td><td>25 May 2026</td><td>7 days</td><td><span class="badge badge-orange">Outstanding</span></td></tr>
+        <tr><td>HBR-D1-PR-008</td><td>Lower Deck Process B</td><td>H-60</td><td class="tr-no">No</td><td>28 May 2026</td><td>4 days</td><td><span class="badge badge-orange">Outstanding</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="overlay" id="overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <div class="detail-header">
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div class="detail-tag" id="dp-tag"></div>
+    <div id="dp-grade-badge" style="margin-top:6px"></div>
+  </div>
+  <div class="detail-body" id="dp-body"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  MAKO Offshore Ltd &nbsp;·&nbsp; Penetration Management Dashboard &nbsp;·&nbsp; Powered by Integr8te &nbsp;·&nbsp; Pilot — Harbour Jade Platform &nbsp;·&nbsp; Confidential
+</div>
+
+<script>
+// ── DATA ──
+const penetrations = [
+  { tag:"HBR-D3-W14-001", deck:"Cellar Deck", module:"C3", rating:"H-120", tr:true, service:"HV Power 11kV Cable", seal:"Nofirno RISE HD", grade:5, status:"Not Performing", wo:"WO-2026-0847", wo_status:"In Progress", due:"30 Jun 2026", icb:"Outstanding", notes:"Modules partially missing. TR boundary H-120. Immediate action required." },
+  { tag:"HBR-D3-W14-002", deck:"Cellar Deck", module:"C3", rating:"H-60", tr:true, service:"Instrument Air", seal:"MAKO Composite Plug", grade:2, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Not Required", notes:"Minor surface crazing. Performing within standard." },
+  { tag:"HBR-D2-M12-003", deck:"Main Deck", module:"M12", rating:"A-60", tr:false, service:"Firewater Main", seal:"Bestabell A-60 Wrap", grade:1, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Complete", notes:"Excellent condition. No action required." },
+  { tag:"HBR-D2-M12-004", deck:"Main Deck", module:"M12", rating:"A-60", tr:false, service:"HC Gas Line 6 inch", seal:"Cast-in-place Resin", grade:4, status:"Degraded", wo:"WO-2026-0891", wo_status:"Open", due:"15 Jul 2026", icb:"Outstanding", notes:"Significant seal shrinkage. HC gas service — priority remediation." },
+  { tag:"HBR-D4-TR-005", deck:"Top Deck", module:"TR-West", rating:"H-120", tr:true, service:"LV Power Cable Bundle", seal:"Bestabell H-120 Transit", grade:3, status:"Degraded", wo:"WO-2026-0855", wo_status:"In Progress", due:"20 Jun 2026", icb:"Outstanding", notes:"Seal modules degraded. TR-West boundary — high criticality." },
+  { tag:"HBR-D4-TR-006", deck:"Top Deck", module:"TR-West", rating:"H-120", tr:true, service:"Comms/CCTV Cable", seal:"Nofirno RISE HD", grade:1, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Complete", notes:"Good condition. No action." },
+  { tag:"HBR-D1-PR-007", deck:"Lower Deck", module:"Process A", rating:"H-60", tr:false, service:"Seawater Injection 8 inch", seal:"MAKO Composite Plug", grade:2, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Not Required", notes:"Performing. Minor cosmetic wear. Monitor at next survey." },
+  { tag:"HBR-D1-PR-008", deck:"Lower Deck", module:"Process B", rating:"H-60", tr:false, service:"Produced Water Line", seal:"Bestabell H-60 Wrap", grade:4, status:"Degraded", wo:"WO-2026-0902", wo_status:"Open", due:"30 Jul 2026", icb:"Outstanding", notes:"Wrap delaminating. Produced water service. Raise with ICB." },
+  { tag:"HBR-D2-UT-009", deck:"Main Deck", module:"Utility", rating:"A-60", tr:false, service:"HVAC Ductwork", seal:"Bestabell Fire Collar", grade:1, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Not Required", notes:"Good condition. No action required." },
+  { tag:"HBR-D3-W14-010", deck:"Cellar Deck", module:"C4", rating:"H-120", tr:true, service:"HC Liquid Line 4 inch", seal:"MAKO Composite Plug", grade:5, status:"Not Performing", wo:"WO-2026-0848", wo_status:"Open", due:"15 Jun 2026", icb:"Outstanding", notes:"Plug missing entirely. HC liquid service. TR boundary H-120. IMMEDIATE ACTION." }
+];
+
+const workpaks = [
+  { ref:"WP-HBR-2026-001", title:"Cellar Deck C3/C4 TR Boundary Remediation", deck:"Cellar Deck", module:"C3 / C4", rating:"H-120", total:12, done:4, status:"In Progress", lead:"M. Killeen", target:"30 Jun 2026", materials:"On Site", notes:"Priority TR boundary scope. 2× Grade 5 in this module. Accelerated programme." },
+  { ref:"WP-HBR-2026-002", title:"Top Deck TR-West H-120 Cable Transits", deck:"Top Deck", module:"TR-West", rating:"H-120", total:8, done:3, status:"In Progress", lead:"M. Killeen", target:"20 Jun 2026", materials:"On Site", notes:"TR-West boundary. High criticality. ICB verification outstanding on all." },
+  { ref:"WP-HBR-2026-003", title:"Main Deck M12 HC Gas & Produced Water", deck:"Main Deck", module:"M12 / Process B", rating:"A-60 / H-60", total:6, done:0, status:"Materials Confirmed", lead:"M. Killeen", target:"31 Jul 2026", materials:"On Order", notes:"Materials on order. Mobilise once confirmed on site." },
+  { ref:"WP-HBR-2026-004", title:"Lower Deck Process A/B Survey & Monitor", deck:"Lower Deck", module:"Process A / B", rating:"H-60", total:18, done:18, status:"QA Pending", lead:"M. Killeen", target:"10 Jun 2026", materials:"N/A", notes:"Survey complete. All penetrations graded. QA review in progress." }
+];
+
+// ── TABS ──
+function showTab(id) {
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if(id==='register') renderTable(penetrations);
+  if(id==='workpaks') renderWorkpaks();
+}
+
+// ── GRADE BADGE ──
+function gradeBadge(g) {
+  return `<span class="grade g${g}">${g}</span>`;
+}
+
+// ── STATUS BADGE ──
+function statusBadge(s) {
+  const map = {"Performing":"badge-green","Degraded":"badge-orange","Not Performing":"badge-red","Unknown":"badge-grey"};
+  return `<span class="badge ${map[s]||'badge-grey'}">${s}</span>`;
+}
+
+// ── WO BADGE ──
+function woBadge(s) {
+  const map = {"None":"badge-grey","Open":"badge-amber","In Progress":"badge-blue","Complete":"badge-green","Deferred":"badge-grey"};
+  return `<span class="badge ${map[s]||'badge-grey'}">${s}</span>`;
+}
+
+// ── ICB BADGE ──
+function icbBadge(s) {
+  const map = {"Not Required":"badge-grey","Outstanding":"badge-orange","Scheduled":"badge-blue","Complete":"badge-green"};
+  return `<span class="badge ${map[s]||'badge-grey'}">${s}</span>`;
+}
+
+// ── RENDER TABLE ──
+function renderTable(data) {
+  const tbody = document.getElementById('reg-tbody');
+  tbody.innerHTML = data.map(p => `
+    <tr class="clickable" onclick='showDetail(${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+      <td><strong>${p.tag}</strong></td>
+      <td>${p.deck}</td>
+      <td>${p.module}</td>
+      <td><span class="badge badge-blue">${p.rating}</span></td>
+      <td class="${p.tr?'tr-yes':'tr-no'}">${p.tr?'YES':'No'}</td>
+      <td>${p.service}</td>
+      <td style="font-size:0.75rem">${p.seal}</td>
+      <td>${gradeBadge(p.grade)}</td>
+      <td>${statusBadge(p.status)}</td>
+      <td>${woBadge(p.wo_status)}</td>
+      <td>${icbBadge(p.icb)}</td>
+    </tr>`).join('');
+}
+
+// ── FILTER TABLE ──
+function filterTable() {
+  const g = document.getElementById('filter-grade').value;
+  const tr = document.getElementById('filter-tr').value;
+  const st = document.getElementById('filter-status').value;
+  const q = document.getElementById('filter-search').value.toLowerCase();
+  let data = penetrations.filter(p => {
+    if(g && p.grade != g) return false;
+    if(tr==='yes' && !p.tr) return false;
+    if(tr==='no' && p.tr) return false;
+    if(st && p.status !== st) return false;
+    if(q && !(p.tag+p.module+p.service+p.deck).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderTable(data);
+}
+
+// ── WORKPAK STATUS COLOUR ──
+function wpClass(s) {
+  if(s==='In Progress') return 'in-progress';
+  if(s.startsWith('Hold')) return 'hold';
+  if(s.startsWith('QA')) return 'qa';
+  if(s==='Closed') return 'closed';
+  if(s==='Materials Confirmed') return 'materials';
+  return '';
+}
+
+// ── RENDER WORKPAKS ──
+function renderWorkpaks() {
+  const c = document.getElementById('wp-container');
+  c.innerHTML = workpaks.map(w => {
+    const pct = Math.round((w.done/w.total)*100);
+    return `
+    <div class="wp-card ${wpClass(w.status)}">
+      <div class="wp-header">
+        <div>
+          <div class="wp-ref">${w.ref} &nbsp;·&nbsp; ${w.deck} · ${w.module} &nbsp;·&nbsp; <span class="badge badge-blue">${w.rating}</span></div>
+          <div class="wp-title">${w.title}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:1rem">
+          ${statusBadge(w.status)}
+        </div>
+      </div>
+      <div class="wp-meta">
+        <span>📋 ${w.done}/${w.total} penetrations complete</span>
+        <span>👤 ${w.lead}</span>
+        <span>📅 Target: ${w.target}</span>
+        <span>📦 Materials: <strong>${w.materials}</strong></span>
+      </div>
+      <div class="wp-prog"><div class="wp-prog-fill" style="width:${pct}%"></div></div>
+      <div style="font-size:0.72rem;color:var(--grey);margin-top:4px">${pct}% complete &nbsp;·&nbsp; ${w.notes}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── DETAIL PANEL ──
+function showDetail(p) {
+  document.getElementById('dp-tag').textContent = p.tag;
+  document.getElementById('dp-grade-badge').innerHTML = `${gradeBadge(p.grade)} &nbsp; ${statusBadge(p.status)} &nbsp; ${p.tr?'<span class="badge badge-red">TR BOUNDARY</span>':''}`;
+  document.getElementById('dp-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">Location</div>
+      <div class="detail-row"><span class="detail-key">Deck Level</span><span class="detail-val">${p.deck}</span></div>
+      <div class="detail-row"><span class="detail-key">Module</span><span class="detail-val">${p.module}</span></div>
+      <div class="detail-row"><span class="detail-key">TR Boundary</span><span class="detail-val">${p.tr?'<strong style="color:var(--red)">YES</strong>':'No'}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Design Data</div>
+      <div class="detail-row"><span class="detail-key">Fire Rating</span><span class="detail-val"><strong>${p.rating}</strong></span></div>
+      <div class="detail-row"><span class="detail-key">Service</span><span class="detail-val">${p.service}</span></div>
+      <div class="detail-row"><span class="detail-key">Seal Type</span><span class="detail-val">${p.seal}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Condition & Status</div>
+      <div class="detail-row"><span class="detail-key">Condition Grade</span><span class="detail-val">${gradeBadge(p.grade)}</span></div>
+      <div class="detail-row"><span class="detail-key">Performance Status</span><span class="detail-val">${statusBadge(p.status)}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Work Order</div>
+      <div class="detail-row"><span class="detail-key">Work Order Ref</span><span class="detail-val">${p.wo}</span></div>
+      <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val">${woBadge(p.wo_status)}</span></div>
+      <div class="detail-row"><span class="detail-key">Due Date</span><span class="detail-val">${p.due}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Verification</div>
+      <div class="detail-row"><span class="detail-key">ICB Verification</span><span class="detail-val">${icbBadge(p.icb)}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Notes</div>
+      <div style="font-size:0.82rem;color:var(--navy);line-height:1.5">${p.notes}</div>
+    </div>`;
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+
+// Init
+renderTable(penetrations);
+</script>
+</body>
+</html>
