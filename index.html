@@ -229,32 +229,35 @@
   <button class="nav-tab" onclick="showTab('risk')">⚠️ Risk & Compliance</button>
 </div>
 
+<!-- DATA STATUS BAR -->
+<div id="data-status-bar" style="background:#0f1e30;color:#B8C4D4;font-size:0.73rem;padding:4px 2rem;border-bottom:1px solid #1E3A5A;min-height:22px;">⟳ Initialising...</div>
+
 <!-- ═══════════ TAB 1: ASSET OVERVIEW ═══════════ -->
 <div class="content active" id="tab-overview">
 
   <div class="kpi-row">
     <div class="kpi-card blue">
-      <div class="kpi-value">847</div>
+      <div class="kpi-value" id="kpi-total">847</div>
       <div class="kpi-label">Total Penetrations</div>
       <div class="kpi-sub">On asset register</div>
     </div>
     <div class="kpi-card green">
-      <div class="kpi-value">601</div>
+      <div class="kpi-value" id="kpi-green">601</div>
       <div class="kpi-label">Performing</div>
       <div class="kpi-sub">Grades 1–2 · 71.0%</div>
     </div>
     <div class="kpi-card orange">
-      <div class="kpi-value">184</div>
+      <div class="kpi-value" id="kpi-amber">184</div>
       <div class="kpi-label">Degraded</div>
       <div class="kpi-sub">Grades 3–4 · 21.7%</div>
     </div>
     <div class="kpi-card red">
-      <div class="kpi-value">28</div>
+      <div class="kpi-value" id="kpi-red">28</div>
       <div class="kpi-label">Failed / Immediate</div>
       <div class="kpi-sub">Grade 5 · 3.3%</div>
     </div>
     <div class="kpi-card grey">
-      <div class="kpi-value">34</div>
+      <div class="kpi-value" id="kpi-grey">34</div>
       <div class="kpi-label">Unknown / Unsurveyed</div>
       <div class="kpi-sub">4.0% remaining</div>
     </div>
@@ -350,22 +353,22 @@
   <div class="section-title">Programme Pace</div>
   <div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
     <div class="kpi-card green">
-      <div class="kpi-value">813</div>
+      <div class="kpi-value" id="kpi-surveyed">813</div>
       <div class="kpi-label">Penetrations Surveyed</div>
       <div class="kpi-sub">96.0% coverage achieved</div>
     </div>
     <div class="kpi-card blue">
-      <div class="kpi-value">42</div>
+      <div class="kpi-value" id="kpi-remediated">42</div>
       <div class="kpi-label">Remediated to Date</div>
       <div class="kpi-sub">of 212 requiring action</div>
     </div>
     <div class="kpi-card amber">
-      <div class="kpi-value">18</div>
+      <div class="kpi-value" id="kpi-icb">18</div>
       <div class="kpi-label">ICB Verifications Outstanding</div>
       <div class="kpi-sub">Submitted, awaiting sign-off</div>
     </div>
     <div class="kpi-card orange">
-      <div class="kpi-value">28</div>
+      <div class="kpi-value" id="kpi-g5">28</div>
       <div class="kpi-label">Grade 5 — Open Actions</div>
       <div class="kpi-sub">All have active work orders</div>
     </div>
@@ -529,8 +532,17 @@
 </div>
 
 <script>
-// ── DATA ──
-const penetrations = [
+// ── CONFIG ──
+const API_BASE = "https://base44.app/api/apps/69b3c05be2379a46d5a4b222/functions";
+const PLATFORM_ASSET = "Harbour_Jade";
+
+// ── LIVE DATA STORE ──
+let penetrations = [];
+let workpaks     = [];
+let liveKPIs     = null;
+
+// ── DEMO FALLBACK (used only if DB is empty or API unreachable) ──
+const DEMO_PENETRATIONS = [
   { tag:"HBR-D3-W14-001", deck:"Cellar Deck", module:"C3", rating:"H-120", tr:true, service:"HV Power 11kV Cable", seal:"Nofirno RISE HD", grade:5, status:"Not Performing", wo:"WO-2026-0847", wo_status:"In Progress", due:"30 Jun 2026", icb:"Outstanding", notes:"Modules partially missing. TR boundary H-120. Immediate action required." },
   { tag:"HBR-D3-W14-002", deck:"Cellar Deck", module:"C3", rating:"H-60", tr:true, service:"Instrument Air", seal:"MAKO Composite Plug", grade:2, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Not Required", notes:"Minor surface crazing. Performing within standard." },
   { tag:"HBR-D2-M12-003", deck:"Main Deck", module:"M12", rating:"A-60", tr:false, service:"Firewater Main", seal:"Bestabell A-60 Wrap", grade:1, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Complete", notes:"Excellent condition. No action required." },
@@ -542,13 +554,151 @@ const penetrations = [
   { tag:"HBR-D2-UT-009", deck:"Main Deck", module:"Utility", rating:"A-60", tr:false, service:"HVAC Ductwork", seal:"Bestabell Fire Collar", grade:1, status:"Performing", wo:"—", wo_status:"None", due:"—", icb:"Not Required", notes:"Good condition. No action required." },
   { tag:"HBR-D3-W14-010", deck:"Cellar Deck", module:"C4", rating:"H-120", tr:true, service:"HC Liquid Line 4 inch", seal:"MAKO Composite Plug", grade:5, status:"Not Performing", wo:"WO-2026-0848", wo_status:"Open", due:"15 Jun 2026", icb:"Outstanding", notes:"Plug missing entirely. HC liquid service. TR boundary H-120. IMMEDIATE ACTION." }
 ];
-
-const workpaks = [
+const DEMO_WORKPAKS = [
   { ref:"WP-HBR-2026-001", title:"Cellar Deck C3/C4 TR Boundary Remediation", deck:"Cellar Deck", module:"C3 / C4", rating:"H-120", total:12, done:4, status:"In Progress", lead:"M. Killeen", target:"30 Jun 2026", materials:"On Site", notes:"Priority TR boundary scope. 2× Grade 5 in this module. Accelerated programme." },
   { ref:"WP-HBR-2026-002", title:"Top Deck TR-West H-120 Cable Transits", deck:"Top Deck", module:"TR-West", rating:"H-120", total:8, done:3, status:"In Progress", lead:"M. Killeen", target:"20 Jun 2026", materials:"On Site", notes:"TR-West boundary. High criticality. ICB verification outstanding on all." },
   { ref:"WP-HBR-2026-003", title:"Main Deck M12 HC Gas & Produced Water", deck:"Main Deck", module:"M12 / Process B", rating:"A-60 / H-60", total:6, done:0, status:"Materials Confirmed", lead:"M. Killeen", target:"31 Jul 2026", materials:"On Order", notes:"Materials on order. Mobilise once confirmed on site." },
   { ref:"WP-HBR-2026-004", title:"Lower Deck Process A/B Survey & Monitor", deck:"Lower Deck", module:"Process A / B", rating:"H-60", total:18, done:18, status:"QA Pending", lead:"M. Killeen", target:"10 Jun 2026", materials:"N/A", notes:"Survey complete. All penetrations graded. QA review in progress." }
 ];
+
+// ── API TOKEN (read scope — set by operator before deploying to client) ──
+// Store in URL param ?token=xxx or set here for internal use
+const urlParams = new URLSearchParams(window.location.search);
+const API_TOKEN  = urlParams.get('token') || '';
+
+// ── LOADING INDICATOR ──
+function setLoadingState(msg) {
+  const el = document.getElementById('data-status-bar');
+  if (el) el.innerHTML = msg;
+}
+
+// ── MAP API RECORD → dashboard display format ──
+function mapRecord(r) {
+  const gradeMap = {
+    'Grade 1 - Good': 1, 'Grade 2 - Minor Degradation': 2,
+    'Grade 3 - Severe Degradation': 3, 'Grade 4 - Failed': 4,
+    'Not Inspected': 0
+  };
+  const statusMap = {
+    'Green': 'Performing', 'Amber': 'Degraded',
+    'Red': 'Not Performing', 'Grey - Not Inspected': 'Not Inspected'
+  };
+  return {
+    tag:       r.tag_no || r.penetration_id || '—',
+    deck:      r.deck || '—',
+    module:    r.module || '—',
+    rating:    r.fire_rating || '—',
+    tr:        r.barrier_functions?.includes('Fire') && (r.fire_rating === 'H-120' || r.fire_rating === 'H-60'),
+    service:   r.service || '—',
+    seal:      r.seal_manufacturer ? `${r.seal_manufacturer} ${r.seal_type||''}`.trim() : '—',
+    grade:     gradeMap[r.seal_condition_grade] ?? 0,
+    status:    statusMap[r.rag_status] || r.rag_status || '—',
+    wo:        r.work_order_ref || '—',
+    wo_status: r.work_order_status || 'None',
+    due:       r.next_inspection_due || '—',
+    icb:       r.icb_verification || '—',
+    notes:     r.comments || r.recommended_action || '—',
+    // preserve raw fields for detail panel
+    _raw: r
+  };
+}
+
+// ── FETCH LIVE DATA ──
+async function loadLiveData() {
+  if (!API_TOKEN) {
+    setLoadingState('⚠ Demo mode — <a href="?token=YOUR_TOKEN" style="color:var(--amber)">add ?token= to URL for live data</a>');
+    penetrations = DEMO_PENETRATIONS;
+    workpaks     = DEMO_WORKPAKS;
+    renderTable(penetrations);
+    renderWorkpaks();
+    return;
+  }
+
+  setLoadingState('<span style="color:var(--amber)">⟳ Loading live data…</span>');
+
+  try {
+    // Fetch penetrations (paginate)
+    let allRecs = [], page = 1, more = true;
+    while (more) {
+      const res = await fetch(`${API_BASE}/makoApiRead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+        body: JSON.stringify({ action: 'list', platform_asset: PLATFORM_ASSET, page, page_size: 500 })
+      });
+      const data = await res.json();
+      if (data.status !== 'ok') throw new Error(data.error?.message || 'API error');
+      allRecs = allRecs.concat(data.data || []);
+      more = (data.data?.length === 500);
+      page++;
+    }
+
+    // Fetch KPIs
+    const kpiRes = await fetch(`${API_BASE}/makoApiRead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+      body: JSON.stringify({ action: 'kpis', platform_asset: PLATFORM_ASSET })
+    });
+    const kpiData = await kpiRes.json();
+    if (kpiData.status === 'ok') liveKPIs = kpiData.data;
+
+    // Fetch workpaks
+    const wpRes = await fetch(`${API_BASE}/makoApiRead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+      body: JSON.stringify({ action: 'list', platform_asset: PLATFORM_ASSET, page_size: 500, entity: 'workpak' })
+    });
+
+    if (allRecs.length > 0) {
+      penetrations = allRecs.map(mapRecord);
+      const syncTime = new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      setLoadingState(`<span style="color:var(--green)">✓ Live — ${allRecs.length} records · Synced ${syncTime}</span>`);
+      document.getElementById('last-sync-label').textContent = `Last sync: ${syncTime}`;
+    } else {
+      // DB empty — use demo data
+      penetrations = DEMO_PENETRATIONS;
+      workpaks     = DEMO_WORKPAKS;
+      setLoadingState('⚠ No records in DB for this asset — showing demo data');
+    }
+
+    // Update KPI cards if we have live data
+    if (liveKPIs) updateKPICards(liveKPIs);
+
+    renderTable(penetrations);
+    renderWorkpaks();
+
+  } catch (e) {
+    console.error('API load failed:', e);
+    penetrations = DEMO_PENETRATIONS;
+    workpaks     = DEMO_WORKPAKS;
+    setLoadingState(`<span style="color:var(--red)">⚠ API unavailable — showing demo data (${e.message})</span>`);
+    renderTable(penetrations);
+    renderWorkpaks();
+  }
+}
+
+// ── UPDATE KPI CARDS WITH LIVE DATA ──
+function updateKPICards(kpis) {
+  const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  safe('kpi-total',   kpis.total ?? '—');
+  safe('kpi-red',     kpis.rag_status?.Red ?? '—');
+  safe('kpi-amber',   kpis.rag_status?.Amber ?? '—');
+  safe('kpi-green',   kpis.rag_status?.Green ?? '—');
+  safe('kpi-grey',    kpis.rag_status?.['Grey - Not Inspected'] ?? '—');
+  safe('kpi-andt',    kpis.andt_not_yet_performed ?? '—');
+  safe('kpi-cui',     kpis.cui_threat_peak ?? '—');
+  safe('kpi-g4',      kpis.seal_condition_grade?.['Grade 4 - Failed'] ?? '—');
+}
+
+// ── PATCH single record back to API ──
+async function patchRecord(id, fields) {
+  if (!API_TOKEN) return { status: 'error', error: { message: 'No API token — demo mode' } };
+  const res = await fetch(`${API_BASE}/makoApiPatch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+    body: JSON.stringify({ id, ...fields })
+  });
+  return res.json();
+}
 
 // ── TABS ──
 function showTab(id) {
@@ -703,7 +853,7 @@ function closeDetail() {
 }
 
 // Init
-renderTable(penetrations);
+loadLiveData();
 </script>
 
 <!-- CSV UPLOAD MODAL -->
@@ -859,6 +1009,7 @@ function commitImport() {
   // Update the live dataset
   penetrations.length = 0;
   mapped.forEach(r => penetrations.push(r));
+  const sb = document.getElementById("data-status-bar"); if(sb) sb.innerHTML = '<span style="color:var(--amber)">⚠ CSV import active — data not persisted to DB. Use bulk import API to save permanently.</span>';
 
   // Re-render
   renderTable(penetrations);
