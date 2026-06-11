@@ -707,7 +707,7 @@ function showTab(id) {
   document.getElementById('tab-'+id).classList.add('active');
   event.currentTarget.classList.add('active');
   if(id==='register') renderTable(penetrations);
-  if(id==='workpaks') renderWorkpaks();
+  if(id==='workpaks') loadWorkpaks();
 }
 
 // ── GRADE BADGE ──
@@ -780,15 +780,127 @@ function wpClass(s) {
 }
 
 // ── RENDER WORKPAKS ──
+// ── WORKPAK LIVE FETCH ──
+let workpaksLoaded = false;
+
+async function loadWorkpaks(force = false) {
+  if (workpaksLoaded && !force) { renderWorkpaks(); return; }
+
+  if (!API_TOKEN) {
+    workpaks = DEMO_WORKPAKS;
+    workpaksLoaded = true;
+    renderWorkpaks();
+    return;
+  }
+
+  const wpContainer = document.getElementById('wp-container');
+  if (wpContainer) wpContainer.innerHTML = '<div style="padding:2rem;color:#B8C4D4;text-align:center">⟳ Loading work packs…</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/makoWorkPakApi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+      body: JSON.stringify({ action: 'list', asset: PLATFORM_ASSET, include_closed: false })
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok' && data.data?.length > 0) {
+      workpaks = data.data.map(mapWorkPak);
+      workpaksLoaded = true;
+
+      // Also fetch summary for KPI card update
+      const sumRes = await fetch(`${API_BASE}/makoWorkPakApi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+        body: JSON.stringify({ action: 'summary', asset: PLATFORM_ASSET })
+      });
+      const sumData = await sumRes.json();
+      if (sumData.status === 'ok') updateWorkPakKPIs(sumData.data);
+    } else {
+      workpaks = DEMO_WORKPAKS;
+      workpaksLoaded = true;
+    }
+  } catch(e) {
+    console.error('WorkPak load failed:', e);
+    workpaks = DEMO_WORKPAKS;
+    workpaksLoaded = true;
+  }
+  renderWorkpaks();
+}
+
+// Map API record → dashboard display format
+function mapWorkPak(r) {
+  return {
+    id:       r.id,
+    ref:      r.workpak_ref,
+    title:    r.title,
+    deck:     r.deck_level || '—',
+    module:   r.module || '—',
+    rating:   r.barrier_rating || '—',
+    total:    r.penetration_count ?? 0,
+    done:     r.complete_count ?? 0,
+    pct:      r.completion_pct ?? 0,
+    status:   r.status,
+    lead:     r.mako_lead || '—',
+    target:   r.target_date || '—',
+    materials:r.materials_status || '—',
+    notes:    r.notes || '',
+    overdue:  r.is_overdue ?? false,
+    _raw:     r
+  };
+}
+
+// Update workpak KPI card on overview tab
+function updateWorkPakKPIs(summary) {
+  const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  safe('kpi-workpaks-active',  summary.active_workpaks ?? '—');
+  safe('kpi-workpaks-overdue', summary.overdue ?? '—');
+  safe('kpi-workpaks-pct',     summary.overall_completion_pct != null ? summary.overall_completion_pct + '%' : '—');
+}
+
+// Progress update — called from inline button in workpak card
+async function updateWPProgress(id, ref) {
+  if (!API_TOKEN) { alert('Demo mode — connect API token to save progress'); return; }
+  const inc = prompt(`WorkPak ${ref}\nEnter number of penetrations just completed:`, '1');
+  if (inc === null) return;
+  const n = parseInt(inc);
+  if (isNaN(n) || n < 1) { alert('Invalid number'); return; }
+  try {
+    const res = await fetch(`${API_BASE}/makoWorkPakApi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_TOKEN}` },
+      body: JSON.stringify({ action: 'progress', id, increment: n })
+    });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      const d = data.data;
+      alert(`Updated!\n${d.complete_count}/${d.penetration_count} complete (${d.completion_pct}%)\nStatus: ${d.status}`);
+      workpaksLoaded = false;
+      loadWorkpaks(true);
+    } else {
+      alert('Error: ' + (data.error?.message || 'Unknown error'));
+    }
+  } catch(e) { alert('Network error: ' + e.message); }
+}
+
 function renderWorkpaks() {
   const c = document.getElementById('wp-container');
+  if (!workpaks.length) {
+    c.innerHTML = '<div style="padding:2rem;color:#B8C4D4;text-align:center">No active work packs found.</div>';
+    return;
+  }
   c.innerHTML = workpaks.map(w => {
-    const pct = Math.round((w.done/w.total)*100);
+    const pct = w.pct ?? Math.round((w.done/w.total)*100) ?? 0;
+    const overdueTag = w.overdue ? '<span style="color:var(--red);font-size:0.7rem;margin-left:8px">⚠ OVERDUE</span>' : '';
+    const hasId = !!w.id;
+    const progressBtn = hasId
+      ? `<button onclick="updateWPProgress('${w.id}','${w.ref}')" style="margin-left:auto;padding:4px 12px;font-size:0.72rem;background:var(--blue);color:#fff;border:none;border-radius:4px;cursor:pointer">+ Update Progress</button>`
+      : '';
     return `
     <div class="wp-card ${wpClass(w.status)}">
       <div class="wp-header">
         <div>
-          <div class="wp-ref">${w.ref} &nbsp;·&nbsp; ${w.deck} · ${w.module} &nbsp;·&nbsp; <span class="badge badge-blue">${w.rating}</span></div>
+          <div class="wp-ref">${w.ref} &nbsp;·&nbsp; ${w.deck} · ${w.module} &nbsp;·&nbsp; <span class="badge badge-blue">${w.rating}</span>${overdueTag}</div>
           <div class="wp-title">${w.title}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:1rem">
@@ -800,9 +912,10 @@ function renderWorkpaks() {
         <span>👤 ${w.lead}</span>
         <span>📅 Target: ${w.target}</span>
         <span>📦 Materials: <strong>${w.materials}</strong></span>
+        ${progressBtn}
       </div>
       <div class="wp-prog"><div class="wp-prog-fill" style="width:${pct}%"></div></div>
-      <div style="font-size:0.72rem;color:var(--grey);margin-top:4px">${pct}% complete &nbsp;·&nbsp; ${w.notes}</div>
+      <div style="font-size:0.72rem;color:var(--grey);margin-top:4px">${pct}% complete${w.notes ? ' &nbsp;·&nbsp; ' + w.notes : ''}</div>
     </div>`;
   }).join('');
 }
